@@ -1,0 +1,26 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+*.csproj.user
+*.DotSettings.user
+
+## Build artifacts
+packages/
+*.nupkg
+
+## IDE
+.vs/
+.vscode/
+.idea/
+*.sln.DotSettings
+
+## OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+## Build output
+releases/
