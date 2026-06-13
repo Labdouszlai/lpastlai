@@ -1,6 +1,6 @@
 # lpastlai
 
-A lightweight clipboard history app for Windows. Lives in the tray, remembers your last 20 copied texts, and lets you paste any of them with **Ctrl+Shift+V**.
+A lightweight clipboard history app for Windows. Lives in the tray, remembers your last 30 copied items (text + images), and lets you paste any of them with **Ctrl+Shift+V**.
 
 ![](https://img.shields.io/badge/Windows-10%2B-blue)
 ![](https://img.shields.io/badge/.NET-8.0-purple)
@@ -8,11 +8,11 @@ A lightweight clipboard history app for Windows. Lives in the tray, remembers yo
 
 ## How it works
 
-- Runs silently in the system tray — no windows, no taskbar entry, no BS.
-- Every time you copy something, it's saved to `%AppData%\lpastlai\history.json`.
-- Hit **Ctrl+Shift+V** anywhere and a popup appears where your cursor is.
-- Arrow keys + Enter (or double-click) to select and paste. Esc to dismiss.
-- Right-click the tray icon for more options.
+- Runs in the system tray — no windows, no taskbar entry.
+- Saves text and images you copy to `%AppData%\lpastlai\history.json`.
+- Hit **Ctrl+Shift+V** anywhere and a split popup appears where your cursor is.
+- Left side: text items. Right side: image items with thumbnails.
+- Tab to switch panels, arrow keys + Enter to paste. Esc to dismiss.
 
 ## Why Ctrl+Shift+V?
 
@@ -59,9 +59,9 @@ Most tweaks are a constant change away:
 | What | Where |
 |------|-------|
 | Hotkey | `HiddenHostForm.cs` — `NativeMethods.MOD_CONTROL \| MOD_SHIFT`, `VK_V` |
-| History limit | `HistoryStore.cs` — `MaxItems` (default 20) |
-| Preview length | `PastePopupForm.cs` — `MaxPreviewLen` (default 60) |
-| Popup width | `PastePopupForm.cs` — `Size(420, ...)` |
+| History limit | `HistoryStore.cs` — `MaxItems` (default 30) |
+| Preview length | `PastePopupForm.cs` — `MaxPreview` (default 60) |
+| Popup width | `PastePopupForm.cs` — `Size(660, ...)` |
 
 ## License
 

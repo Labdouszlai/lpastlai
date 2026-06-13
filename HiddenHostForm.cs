@@ -130,7 +130,7 @@ public class HiddenHostForm : Form
             NativeMethods.SetForegroundWindow(lastForegroundWindow);
 
         pasteTimer?.Stop();
-        pasteTimer = new System.Windows.Forms.Timer { Interval = 80 };
+        pasteTimer = new System.Windows.Forms.Timer { Interval = 80 }; // TODO: make this tweakable
         pasteTimer.Tick += (s, e) =>
         {
             pasteTimer!.Stop();

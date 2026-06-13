@@ -5,13 +5,17 @@ namespace lpastlai;
 
 public class PastePopupForm : Form
 {
-    private readonly ListBox listBox;
-    private readonly List<ClipItem> items;
+    private readonly List<ClipItem> allItems;
     private readonly Action<ClipItem> onSelect;
-    private const int TextItemHeight = 44;
-    private const int ImageItemHeight = 80;
-    private const int MaxPreviewLen = 60;
-    private const int ThumbSize = 64;
+    private readonly ListBox textList;
+    private readonly ListBox imgList;
+    private readonly List<ClipItem> textItems = new();
+    private readonly List<ClipItem> imgItems = new();
+
+    private const int TextItemH = 44;
+    private const int ImgItemH = 80;
+    private const int MaxPreview = 60;
+    private const int Thumb = 64;
 
     private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
     private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
@@ -20,22 +24,108 @@ public class PastePopupForm : Form
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
-    public PastePopupForm(List<ClipItem> items, Action<ClipItem> onSelect)
+    public PastePopupForm(List<ClipItem> allItems, Action<ClipItem> onSelect)
     {
-        this.items = items;
+        this.allItems = allItems;
         this.onSelect = onSelect;
+
+        foreach (var item in allItems)
+        {
+            if (item.IsImage)
+                imgItems.Add(item);
+            else
+                textItems.Add(item);
+        }
+
+        int maxText = Math.Min(textItems.Count, 8);
+        int maxImg = Math.Min(imgItems.Count, 8);
+        int h = Math.Max(
+            maxText > 0 ? maxText * TextItemH : TextItemH,
+            maxImg > 0 ? maxImg * ImgItemH : ImgItemH
+        ) + 28;
 
         FormBorderStyle = FormBorderStyle.None;
         TopMost = true;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.Manual;
-        Size = new Size(420, CalcHeight(items));
-        MinimumSize = new Size(280, TextItemHeight);
+        Size = new Size(660, h);
+        MinimumSize = new Size(400, 160);
         BackColor = Color.FromArgb(30, 30, 30);
 
         _ = Handle;
 
-        listBox = new ListBox
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 2,
+            BackColor = Color.FromArgb(30, 30, 30)
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var textHeader = MakeHeader("Text");
+        var imgHeader = MakeHeader("Images");
+        layout.Controls.Add(textHeader, 0, 0);
+        layout.Controls.Add(imgHeader, 1, 0);
+
+        textList = MakeList(DrawMode.OwnerDrawVariable);
+        imgList = MakeList(DrawMode.OwnerDrawVariable);
+
+        FillList(textList, textItems, false);
+        FillList(imgList, imgItems, true);
+
+        textList.MeasureItem += (_, e) => e.ItemHeight = TextItemH;
+        imgList.MeasureItem += (_, e) => e.ItemHeight = ImgItemH;
+        textList.DrawItem += OnDrawTextItem;
+        imgList.DrawItem += OnDrawImgItem;
+
+        textList.DoubleClick += (_, _) => Pick(textList, textItems);
+        imgList.DoubleClick += (_, _) => Pick(imgList, imgItems);
+
+        textList.KeyDown += (_, e) => HandleKey(e, textList, textItems);
+        imgList.KeyDown += (_, e) => HandleKey(e, imgList, imgItems);
+
+        layout.Controls.Add(textList, 0, 1);
+        layout.Controls.Add(imgList, 1, 1);
+
+        Controls.Add(layout);
+
+        Deactivate += (_, _) => Close();
+        KeyPreview = true;
+        KeyDown += (_, e) =>
+        {
+            if (e.KeyCode == Keys.Escape) Close();
+            if (e.KeyCode == Keys.Tab)
+            {
+                if (textList.Focused)
+                    imgList.Focus();
+                else
+                    textList.Focus();
+                e.Handled = true;
+            }
+        };
+    }
+
+    private static Label MakeHeader(string text)
+    {
+        return new Label
+        {
+            Text = text,
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI Semibold", 9f),
+            ForeColor = Color.FromArgb(160, 160, 160),
+            BackColor = Color.FromArgb(38, 38, 38),
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(10, 0, 0, 0)
+        };
+    }
+
+    private static ListBox MakeList(DrawMode mode)
+    {
+        return new ListBox
         {
             Dock = DockStyle.Fill,
             BorderStyle = BorderStyle.None,
@@ -43,44 +133,45 @@ public class PastePopupForm : Form
             BackColor = Color.FromArgb(30, 30, 30),
             ForeColor = Color.FromArgb(220, 220, 220),
             Font = new Font("Segoe UI", 9f),
-            DrawMode = DrawMode.OwnerDrawVariable
+            DrawMode = mode
         };
+    }
 
-        if (items.Count == 0)
+    private static void FillList(ListBox list, List<ClipItem> source, bool isImage)
+    {
+        if (source.Count == 0)
         {
-            listBox.Items.Add("(empty)");
-            listBox.Enabled = false;
+            list.Items.Add(isImage ? "(no images)" : "(no text)");
+            list.Enabled = false;
         }
         else
         {
-            foreach (var item in items)
-                listBox.Items.Add(item);
+            foreach (var item in source)
+                list.Items.Add(item);
         }
-
-        listBox.MeasureItem += OnMeasureItem;
-        listBox.DrawItem += OnDrawItem;
-        listBox.DoubleClick += (_, _) => SelectCurrent();
-        listBox.KeyDown += (_, e) =>
-        {
-            if (e.KeyCode == Keys.Enter) { SelectCurrent(); e.Handled = true; }
-            else if (e.KeyCode == Keys.Escape) Close();
-        };
-
-        Controls.Add(listBox);
-
-        Deactivate += (_, _) => Close();
-        KeyPreview = true;
-        KeyDown += (_, e) => { if (e.KeyCode == Keys.Escape) Close(); };
     }
 
-    private static int CalcHeight(List<ClipItem> items)
+    private void HandleKey(KeyEventArgs e, ListBox list, List<ClipItem> source)
     {
-        if (items.Count == 0) return TextItemHeight;
-        int visible = Math.Min(items.Count, 10);
-        int h = 0;
-        for (int i = 0; i < visible; i++)
-            h += items[i].IsImage ? ImageItemHeight : TextItemHeight;
-        return h;
+        if (e.KeyCode == Keys.Enter)
+        {
+            Pick(list, source);
+            e.Handled = true;
+        }
+        else if (e.KeyCode == Keys.Escape)
+        {
+            Close();
+        }
+    }
+
+    private void Pick(ListBox list, List<ClipItem> source)
+    {
+        int idx = list.SelectedIndex;
+        if (idx >= 0 && idx < source.Count)
+        {
+            Close();
+            onSelect(source[idx]);
+        }
     }
 
     protected override CreateParams CreateParams
@@ -108,9 +199,9 @@ public class PastePopupForm : Form
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
-        if (listBox.Items.Count > 0)
-            listBox.SelectedIndex = 0;
-        listBox.Focus();
+        if (textList.Items.Count > 0)
+            textList.SelectedIndex = 0;
+        textList.Focus();
 
         var screen = Screen.FromPoint(Location).WorkingArea;
         int x = Math.Clamp(Location.X, screen.Left, screen.Right - Width);
@@ -136,129 +227,105 @@ public class PastePopupForm : Form
         }
     }
 
-    private void OnMeasureItem(object? sender, MeasureItemEventArgs e)
-    {
-        if (items.Count == 0 || e.Index < 0 || e.Index >= items.Count)
-        {
-            e.ItemHeight = TextItemHeight;
-            return;
-        }
-
-        e.ItemHeight = items[e.Index].IsImage ? ImageItemHeight : TextItemHeight;
-    }
-
-    private void OnDrawItem(object? sender, DrawItemEventArgs e)
+    private void OnDrawTextItem(object? sender, DrawItemEventArgs e)
     {
         if (e.Index < 0) return;
-
         var g = e.Graphics;
         g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+        var r = e.Bounds;
+        bool sel = (e.State & DrawItemState.Selected) != 0;
 
-        var rect = e.Bounds;
-        bool selected = (e.State & DrawItemState.Selected) != 0;
+        using var bg = new SolidBrush(sel ? Color.FromArgb(70, 70, 75) : BackColor);
+        g.FillRectangle(bg, r);
 
-        using var bg = new SolidBrush(selected ? Color.FromArgb(70, 70, 75) : BackColor);
-        g.FillRectangle(bg, rect);
+        if (textItems.Count == 0) return;
 
-        if (items.Count == 0)
-            return;
+        using var sep = new Pen(Color.FromArgb(42, 42, 42));
+        g.DrawLine(sep, r.Left, r.Top, r.Right, r.Top);
 
-        using var sepPen = new Pen(Color.FromArgb(42, 42, 42));
-        g.DrawLine(sepPen, rect.Left, rect.Top, rect.Right, rect.Top);
+        var item = textItems[e.Index];
+        string preview = TextPreview(item.Text);
 
-        var item = items[e.Index];
-        if (item.IsImage)
-            DrawImageItem(g, rect, item, selected);
-        else
-            DrawTextItem(g, rect, item, selected);
+        using var pf = new Font("Segoe UI", 9.5f);
+        using var tb = new SolidBrush(sel ? Color.White : Color.FromArgb(220, 220, 220));
+        g.DrawString(preview, pf, tb, r.Left + 10, r.Top + 6);
+
+        using var tf = new Font("Segoe UI", 8f);
+        using var tim = new SolidBrush(Color.FromArgb(130, 130, 130));
+        g.DrawString(TimeAgo(item.Time), tf, tim, r.Left + 10, r.Bottom - 18);
     }
 
-    private void DrawTextItem(Graphics g, Rectangle rect, ClipItem item, bool selected)
+    private void OnDrawImgItem(object? sender, DrawItemEventArgs e)
     {
-        using var previewFont = new Font("Segoe UI", 9.5f);
-        using var textBrush = new SolidBrush(selected ? Color.White : Color.FromArgb(220, 220, 220));
-        string preview = BuildPreview(item.Text);
-        var textRect = new Rectangle(rect.Left + 12, rect.Top + 6, rect.Width - 24, 20);
-        g.DrawString(preview, previewFont, textBrush, textRect);
+        if (e.Index < 0) return;
+        var g = e.Graphics;
+        g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+        var r = e.Bounds;
+        bool sel = (e.State & DrawItemState.Selected) != 0;
 
-        using var timeFont = new Font("Segoe UI", 8f);
-        using var timeBrush = new SolidBrush(Color.FromArgb(130, 130, 130));
-        var timeRect = new Rectangle(rect.Left + 12, rect.Bottom - 18, rect.Width - 24, 14);
-        g.DrawString(FormatTime(item.Time), timeFont, timeBrush, timeRect);
-    }
+        using var bg = new SolidBrush(sel ? Color.FromArgb(70, 70, 75) : BackColor);
+        g.FillRectangle(bg, r);
 
-    private void DrawImageItem(Graphics g, Rectangle rect, ClipItem item, bool selected)
-    {
-        int thumbX = rect.Left + 10;
-        int thumbY = rect.Top + (rect.Height - ThumbSize) / 2;
+        if (imgItems.Count == 0) return;
 
-        using var framePen = new Pen(Color.FromArgb(60, 60, 60));
-        g.DrawRectangle(framePen, thumbX - 1, thumbY - 1, ThumbSize + 1, ThumbSize + 1);
+        using var sep = new Pen(Color.FromArgb(42, 42, 42));
+        g.DrawLine(sep, r.Left, r.Top, r.Right, r.Top);
+
+        var item = imgItems[e.Index];
+        int tx = r.Left + 8;
+        int ty = r.Top + (r.Height - Thumb) / 2;
+
+        using var frame = new Pen(Color.FromArgb(60, 60, 60));
+        g.DrawRectangle(frame, tx, ty, Thumb, Thumb);
 
         try
         {
             using var ms = new MemoryStream(item.ImageData!);
             using var img = Image.FromStream(ms);
-            using var thumb = new Bitmap(img, ThumbSize, ThumbSize);
-            g.DrawImage(thumb, thumbX, thumbY);
+            using var thumb = new Bitmap(img, Thumb, Thumb);
+            g.DrawImage(thumb, tx, ty);
         }
         catch
         {
-            using var font = new Font("Segoe UI", 7f);
-            using var brush = new SolidBrush(Color.FromArgb(100, 100, 100));
-            g.DrawString("preview", font, brush, thumbX + 8, thumbY + 24);
+            using var f = new Font("Segoe UI", 7f);
+            using var b = new SolidBrush(Color.FromArgb(100, 100, 100));
+            g.DrawString("err", f, b, tx + 20, ty + 24);
         }
 
-        using var infoFont = new Font("Segoe UI", 9f);
-        using var infoBrush = new SolidBrush(selected ? Color.White : Color.FromArgb(220, 220, 220));
-        int labelX = thumbX + ThumbSize + 14;
-        g.DrawString("Image", infoFont, infoBrush, new Rectangle(labelX, rect.Top + 10, rect.Right - labelX - 10, 18));
+        int lx = tx + Thumb + 12;
+        using var nf = new Font("Segoe UI", 9f);
+        using var nb = new SolidBrush(sel ? Color.White : Color.FromArgb(220, 220, 220));
+        g.DrawString("Image", nf, nb, lx, r.Top + 12);
 
-        using var dimFont = new Font("Segoe UI", 8f);
-        using var dimBrush = new SolidBrush(Color.FromArgb(130, 130, 130));
+        using var tf = new Font("Segoe UI", 8f);
+        using var db = new SolidBrush(Color.FromArgb(130, 130, 130));
         string dims = "";
         try
         {
-            using var ms2 = new MemoryStream(item.ImageData!);
-            using var img2 = Image.FromStream(ms2);
-            dims = $"{img2.Width} × {img2.Height} px";
+            using var ms = new MemoryStream(item.ImageData!);
+            using var img = Image.FromStream(ms);
+            dims = $"{img.Width}x{img.Height}";
         }
-        catch
-        {
-            dims = "";
-        }
-        g.DrawString(dims, dimFont, dimBrush, new Rectangle(labelX, rect.Top + 30, rect.Right - labelX - 10, 16));
+        catch { }
+        g.DrawString(dims, tf, db, lx, r.Top + 32);
 
-        using var timeFont = new Font("Segoe UI", 8f);
-        using var timeBrush = new SolidBrush(Color.FromArgb(130, 130, 130));
-        g.DrawString(FormatTime(item.Time), timeFont, timeBrush,
-                     new Rectangle(labelX, rect.Bottom - 18, rect.Right - labelX - 10, 14));
+        using var tm = new SolidBrush(Color.FromArgb(130, 130, 130));
+        g.DrawString(TimeAgo(item.Time), tf, tm, lx, r.Bottom - 18);
     }
 
-    private static string FormatTime(DateTime dt)
+    private static string TimeAgo(DateTime dt)
     {
-        var diff = DateTime.Now - dt;
-        if (diff.TotalMinutes < 1) return "Just now";
-        if (diff.TotalHours < 1) return $"{(int)diff.TotalMinutes}m ago";
-        if (diff.TotalDays < 1) return $"{(int)diff.TotalHours}h ago";
-        if (diff.TotalDays < 7) return $"{(int)diff.TotalDays}d ago";
+        var d = DateTime.Now - dt;
+        if (d.TotalMinutes < 1) return "now";
+        if (d.TotalHours < 1) return $"{(int)d.TotalMinutes}m";
+        if (d.TotalDays < 1) return $"{(int)d.TotalHours}h";
+        if (d.TotalDays < 7) return $"{(int)d.TotalDays}d";
         return dt.ToString("MMM dd");
     }
 
-    private static string BuildPreview(string text)
+    private static string TextPreview(string text)
     {
-        string preview = text.Replace("\r", " ").Replace("\n", " ¶ ").Trim();
-        return preview.Length > MaxPreviewLen ? preview[..MaxPreviewLen] + "…" : preview;
-    }
-
-    private void SelectCurrent()
-    {
-        int idx = listBox.SelectedIndex;
-        if (idx >= 0 && idx < items.Count)
-        {
-            var item = items[idx];
-            Close();
-            onSelect(item);
-        }
+        string s = text.Replace("\r", " ").Replace("\n", " \u00b6 ").Trim();
+        return s.Length > MaxPreview ? s[..MaxPreview] + "\u2026" : s;
     }
 }
