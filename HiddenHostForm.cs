@@ -12,10 +12,12 @@ public class HiddenHostForm : Form
     private System.Windows.Forms.Timer? pasteTimer;
     private Icon? appIcon;
     private Bitmap? iconBitmap;
+    private HotkeySettings hotkey;
 
     public HiddenHostForm()
     {
         history = HistoryStore.Load();
+        hotkey = HotkeySettings.Load();
 
         ShowInTaskbar = false;
         FormBorderStyle = FormBorderStyle.None;
@@ -44,12 +46,17 @@ public class HiddenHostForm : Form
         base.OnHandleCreated(e);
 
         NativeMethods.AddClipboardFormatListener(Handle);
+        RegisterHotkey();
+    }
 
-        NativeMethods.RegisterHotKey(
-            Handle,
-            HOTKEY_ID,
-            NativeMethods.MOD_CONTROL | NativeMethods.MOD_SHIFT | NativeMethods.MOD_NOREPEAT,
-            NativeMethods.VK_V);
+    private void RegisterHotkey()
+    {
+        NativeMethods.RegisterHotKey(Handle, HOTKEY_ID, hotkey.Modifiers, hotkey.Key);
+    }
+
+    private void UnregisterHotkey()
+    {
+        NativeMethods.UnregisterHotKey(Handle, HOTKEY_ID);
     }
 
     protected override void WndProc(ref Message m)
@@ -154,7 +161,7 @@ public class HiddenHostForm : Form
         var menu = new ContextMenuStrip();
         menu.Renderer = new DarkMenuRenderer();
 
-        var showItem = new ToolStripMenuItem("Paste by...  (Ctrl+Shift+V)");
+        var showItem = new ToolStripMenuItem("Paste by...  (" + hotkey.Display + ")");
         showItem.Click += (s, e) => ShowPastePopup();
         menu.Items.Add(showItem);
 
@@ -174,6 +181,12 @@ public class HiddenHostForm : Form
 
         menu.Items.Add(new ToolStripSeparator());
 
+        var settingsItem = new ToolStripMenuItem("Settings...");
+        settingsItem.Click += (s, e) => OpenSettings();
+        menu.Items.Add(settingsItem);
+
+        menu.Items.Add(new ToolStripSeparator());
+
         var exitItem = new ToolStripMenuItem("Exit");
         exitItem.Click += (s, e) => ExitApp();
         menu.Items.Add(exitItem);
@@ -183,12 +196,27 @@ public class HiddenHostForm : Form
         trayIcon = new NotifyIcon
         {
             Icon = appIcon,
-            Text = "lpastlai — Paste by (Ctrl+Shift+V)",
+            Text = "lpastlai — " + hotkey.Display,
             Visible = true,
             ContextMenuStrip = menu
         };
 
         trayIcon.DoubleClick += (s, e) => ShowPastePopup();
+    }
+
+    private void OpenSettings()
+    {
+        var form = new SettingsForm(hotkey);
+        form.ShowDialog();
+
+        if (form.Result.Modifiers != hotkey.Modifiers || form.Result.Key != hotkey.Key)
+        {
+            hotkey = form.Result;
+            UnregisterHotkey();
+            RegisterHotkey();
+            trayIcon.Text = "lpastlai — " + hotkey.Display;
+            trayIcon.ContextMenuStrip!.Items[0].Text = "Paste by...  (" + hotkey.Display + ")";
+        }
     }
 
     private Icon CreateTrayIcon()
@@ -211,7 +239,7 @@ public class HiddenHostForm : Form
 
     private void ExitApp()
     {
-        NativeMethods.UnregisterHotKey(Handle, HOTKEY_ID);
+        UnregisterHotkey();
         NativeMethods.RemoveClipboardFormatListener(Handle);
         trayIcon.Visible = false;
         trayIcon.Icon = null;
@@ -225,7 +253,7 @@ public class HiddenHostForm : Form
     {
         if (disposing)
         {
-            NativeMethods.UnregisterHotKey(Handle, HOTKEY_ID);
+            UnregisterHotkey();
             NativeMethods.RemoveClipboardFormatListener(Handle);
             trayIcon?.Dispose();
             appIcon?.Dispose();
