@@ -4,7 +4,7 @@ namespace lpastlai;
 
 public static class HistoryStore
 {
-    public const int MaxItems = 30;
+    public const int MaxStored = 50;
 
     private static readonly string FolderPath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "lpastlai");
@@ -34,8 +34,8 @@ public static class HistoryStore
         {
             Directory.CreateDirectory(FolderPath);
 
-            if (items.Count > MaxItems)
-                items.RemoveRange(MaxItems, items.Count - MaxItems);
+            if (items.Count > MaxStored)
+                items.RemoveRange(MaxStored, items.Count - MaxStored);
 
             string json = JsonSerializer.Serialize(items, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(FilePath, json);
@@ -53,8 +53,8 @@ public static class HistoryStore
         items.RemoveAll(i => i.Text == text);
         items.Insert(0, new ClipItem { Text = text, Time = DateTime.Now });
 
-        if (items.Count > MaxItems)
-            items.RemoveRange(MaxItems, items.Count - MaxItems);
+        if (items.Count > MaxStored)
+            items.RemoveRange(MaxStored, items.Count - MaxStored);
 
         Save(items);
     }
@@ -67,8 +67,8 @@ public static class HistoryStore
 
         items.Insert(0, new ClipItem { ImageData = data, Time = DateTime.Now });
 
-        if (items.Count > MaxItems)
-            items.RemoveRange(MaxItems, items.Count - MaxItems);
+        if (items.Count > MaxStored)
+            items.RemoveRange(MaxStored, items.Count - MaxStored);
 
         Save(items);
     }

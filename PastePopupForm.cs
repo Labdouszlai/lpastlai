@@ -11,6 +11,7 @@ public class PastePopupForm : Form
     private readonly ListBox imgList;
     private readonly List<ClipItem> textItems = new();
     private readonly List<ClipItem> imgItems = new();
+    private readonly AppSettings settings;
 
     private const int TextItemH = 44;
     private const int ImgItemH = 80;
@@ -24,10 +25,11 @@ public class PastePopupForm : Form
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
-    public PastePopupForm(List<ClipItem> allItems, Action<ClipItem> onSelect)
+    public PastePopupForm(List<ClipItem> allItems, Action<ClipItem> onSelect, AppSettings settings)
     {
         this.allItems = allItems;
         this.onSelect = onSelect;
+        this.settings = settings;
 
         foreach (var item in allItems)
         {
@@ -37,8 +39,8 @@ public class PastePopupForm : Form
                 textItems.Add(item);
         }
 
-        int maxText = Math.Min(textItems.Count, 8);
-        int maxImg = Math.Min(imgItems.Count, 8);
+        int maxText = Math.Min(textItems.Count, settings.MaxTextItems);
+        int maxImg = Math.Min(imgItems.Count, settings.MaxImageItems);
         int h = Math.Max(
             maxText > 0 ? maxText * TextItemH : TextItemH,
             maxImg > 0 ? maxImg * ImgItemH : ImgItemH
@@ -50,7 +52,7 @@ public class PastePopupForm : Form
         StartPosition = FormStartPosition.Manual;
         Size = new Size(660, h);
         MinimumSize = new Size(400, 160);
-        BackColor = Color.FromArgb(30, 30, 30);
+        BackColor = settings.BgColor;
         Icon = Program.LoadAppIcon();
 
         _ = Handle;
@@ -60,7 +62,7 @@ public class PastePopupForm : Form
             Dock = DockStyle.Fill,
             ColumnCount = 2,
             RowCount = 2,
-            BackColor = Color.FromArgb(30, 30, 30)
+            BackColor = settings.BgColor
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
@@ -72,8 +74,8 @@ public class PastePopupForm : Form
         layout.Controls.Add(textHeader, 0, 0);
         layout.Controls.Add(imgHeader, 1, 0);
 
-        textList = MakeList(DrawMode.OwnerDrawVariable);
-        imgList = MakeList(DrawMode.OwnerDrawVariable);
+        textList = MakeList();
+        imgList = MakeList();
 
         FillList(textList, textItems, false);
         FillList(imgList, imgItems, true);
@@ -110,31 +112,31 @@ public class PastePopupForm : Form
         };
     }
 
-    private static Label MakeHeader(string text)
+    private Label MakeHeader(string text)
     {
         return new Label
         {
             Text = text,
             Dock = DockStyle.Fill,
             Font = new Font("Segoe UI Semibold", 9f),
-            ForeColor = Color.FromArgb(160, 160, 160),
-            BackColor = Color.FromArgb(38, 38, 38),
+            ForeColor = Shift(settings.FgColor, 0.6f),
+            BackColor = Shift(settings.BgColor, 0.08f),
             TextAlign = ContentAlignment.MiddleLeft,
             Padding = new Padding(10, 0, 0, 0)
         };
     }
 
-    private static ListBox MakeList(DrawMode mode)
+    private ListBox MakeList()
     {
         return new ListBox
         {
             Dock = DockStyle.Fill,
             BorderStyle = BorderStyle.None,
             IntegralHeight = false,
-            BackColor = Color.FromArgb(30, 30, 30),
-            ForeColor = Color.FromArgb(220, 220, 220),
+            BackColor = settings.BgColor,
+            ForeColor = settings.FgColor,
             Font = new Font("Segoe UI", 9f),
-            DrawMode = mode
+            DrawMode = DrawMode.OwnerDrawVariable
         };
     }
 
@@ -236,23 +238,23 @@ public class PastePopupForm : Form
         var r = e.Bounds;
         bool sel = (e.State & DrawItemState.Selected) != 0;
 
-        using var bg = new SolidBrush(sel ? Color.FromArgb(70, 70, 75) : BackColor);
+        using var bg = new SolidBrush(sel ? Shift(settings.BgColor, 0.15f) : settings.BgColor);
         g.FillRectangle(bg, r);
 
         if (textItems.Count == 0) return;
 
-        using var sep = new Pen(Color.FromArgb(42, 42, 42));
+        using var sep = new Pen(Shift(settings.BgColor, 0.08f));
         g.DrawLine(sep, r.Left, r.Top, r.Right, r.Top);
 
         var item = textItems[e.Index];
         string preview = TextPreview(item.Text);
 
         using var pf = new Font("Segoe UI", 9.5f);
-        using var tb = new SolidBrush(sel ? Color.White : Color.FromArgb(220, 220, 220));
+        using var tb = new SolidBrush(sel ? settings.FgColor : settings.FgColor);
         g.DrawString(preview, pf, tb, r.Left + 10, r.Top + 6);
 
         using var tf = new Font("Segoe UI", 8f);
-        using var tim = new SolidBrush(Color.FromArgb(130, 130, 130));
+        using var tim = new SolidBrush(Shift(settings.FgColor, 0.4f));
         g.DrawString(TimeAgo(item.Time), tf, tim, r.Left + 10, r.Bottom - 18);
     }
 
@@ -264,19 +266,19 @@ public class PastePopupForm : Form
         var r = e.Bounds;
         bool sel = (e.State & DrawItemState.Selected) != 0;
 
-        using var bg = new SolidBrush(sel ? Color.FromArgb(70, 70, 75) : BackColor);
+        using var bg = new SolidBrush(sel ? Shift(settings.BgColor, 0.15f) : settings.BgColor);
         g.FillRectangle(bg, r);
 
         if (imgItems.Count == 0) return;
 
-        using var sep = new Pen(Color.FromArgb(42, 42, 42));
+        using var sep = new Pen(Shift(settings.BgColor, 0.08f));
         g.DrawLine(sep, r.Left, r.Top, r.Right, r.Top);
 
         var item = imgItems[e.Index];
         int tx = r.Left + 8;
         int ty = r.Top + (r.Height - Thumb) / 2;
 
-        using var frame = new Pen(Color.FromArgb(60, 60, 60));
+        using var frame = new Pen(Shift(settings.BgColor, 0.12f));
         g.DrawRectangle(frame, tx, ty, Thumb, Thumb);
 
         try
@@ -289,17 +291,17 @@ public class PastePopupForm : Form
         catch
         {
             using var f = new Font("Segoe UI", 7f);
-            using var b = new SolidBrush(Color.FromArgb(100, 100, 100));
+            using var b = new SolidBrush(Shift(settings.FgColor, 0.5f));
             g.DrawString("err", f, b, tx + 20, ty + 24);
         }
 
         int lx = tx + Thumb + 12;
         using var nf = new Font("Segoe UI", 9f);
-        using var nb = new SolidBrush(sel ? Color.White : Color.FromArgb(220, 220, 220));
+        using var nb = new SolidBrush(sel ? settings.FgColor : settings.FgColor);
         g.DrawString("Image", nf, nb, lx, r.Top + 12);
 
         using var tf = new Font("Segoe UI", 8f);
-        using var db = new SolidBrush(Color.FromArgb(130, 130, 130));
+        using var db = new SolidBrush(Shift(settings.FgColor, 0.4f));
         string dims = "";
         try
         {
@@ -310,8 +312,27 @@ public class PastePopupForm : Form
         catch { }
         g.DrawString(dims, tf, db, lx, r.Top + 32);
 
-        using var tm = new SolidBrush(Color.FromArgb(130, 130, 130));
+        using var tm = new SolidBrush(Shift(settings.FgColor, 0.4f));
         g.DrawString(TimeAgo(item.Time), tf, tm, lx, r.Bottom - 18);
+    }
+
+    private static Color Shift(Color c, float factor)
+    {
+        float lum = (0.299f * c.R + 0.587f * c.G + 0.114f * c.B) / 255f;
+        if (lum > 0.5f)
+        {
+            int r = Math.Max(0, (int)(c.R * (1 - factor)));
+            int g = Math.Max(0, (int)(c.G * (1 - factor)));
+            int b = Math.Max(0, (int)(c.B * (1 - factor)));
+            return Color.FromArgb(r, g, b);
+        }
+        else
+        {
+            int r = Math.Min(255, (int)(c.R + (255 - c.R) * factor));
+            int g = Math.Min(255, (int)(c.G + (255 - c.G) * factor));
+            int b = Math.Min(255, (int)(c.B + (255 - c.B) * factor));
+            return Color.FromArgb(r, g, b);
+        }
     }
 
     private static string TimeAgo(DateTime dt)

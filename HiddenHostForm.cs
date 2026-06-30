@@ -9,12 +9,12 @@ public class HiddenHostForm : Form
     private IntPtr lastForegroundWindow = IntPtr.Zero;
     private System.Windows.Forms.Timer? pasteTimer;
     private Icon? appIcon;
-    private HotkeySettings hotkey;
+    private AppSettings settings;
 
     public HiddenHostForm()
     {
         history = HistoryStore.Load();
-        hotkey = HotkeySettings.Load();
+        settings = AppSettings.Load();
 
         ShowInTaskbar = false;
         FormBorderStyle = FormBorderStyle.None;
@@ -48,7 +48,7 @@ public class HiddenHostForm : Form
 
     private void RegisterHotkey()
     {
-        NativeMethods.RegisterHotKey(Handle, HOTKEY_ID, hotkey.Modifiers, hotkey.Key);
+        NativeMethods.RegisterHotKey(Handle, HOTKEY_ID, settings.HotkeyModifiers, settings.HotkeyKey);
     }
 
     private void UnregisterHotkey()
@@ -101,7 +101,7 @@ public class HiddenHostForm : Form
 
         NativeMethods.GetCursorPos(out var pos);
 
-        var popup = new PastePopupForm(history, OnItemChosen)
+        var popup = new PastePopupForm(history, OnItemChosen, settings)
         {
             StartPosition = FormStartPosition.Manual,
             Location = new Point(pos.X, pos.Y)
@@ -134,7 +134,7 @@ public class HiddenHostForm : Form
             NativeMethods.SetForegroundWindow(lastForegroundWindow);
 
         pasteTimer?.Stop();
-        pasteTimer = new System.Windows.Forms.Timer { Interval = 80 }; // TODO: make this tweakable
+        pasteTimer = new System.Windows.Forms.Timer { Interval = 80 };
         pasteTimer.Tick += (s, e) =>
         {
             pasteTimer!.Stop();
@@ -158,7 +158,7 @@ public class HiddenHostForm : Form
         var menu = new ContextMenuStrip();
         menu.Renderer = new DarkMenuRenderer();
 
-        var showItem = new ToolStripMenuItem("Paste by...  (" + hotkey.Display + ")");
+        var showItem = new ToolStripMenuItem("Paste by...  (" + settings.HotkeyDisplay + ")");
         showItem.Click += (s, e) => ShowPastePopup();
         menu.Items.Add(showItem);
 
@@ -193,7 +193,7 @@ public class HiddenHostForm : Form
         trayIcon = new NotifyIcon
         {
             Icon = appIcon,
-            Text = "lpastlai — " + hotkey.Display,
+            Text = "lpastlai — " + settings.HotkeyDisplay,
             Visible = true,
             ContextMenuStrip = menu
         };
@@ -203,17 +203,14 @@ public class HiddenHostForm : Form
 
     private void OpenSettings()
     {
-        var form = new SettingsForm(hotkey);
+        var form = new SettingsForm(settings);
         form.ShowDialog();
 
-        if (form.Result.Modifiers != hotkey.Modifiers || form.Result.Key != hotkey.Key)
-        {
-            hotkey = form.Result;
-            UnregisterHotkey();
-            RegisterHotkey();
-            trayIcon.Text = "lpastlai — " + hotkey.Display;
-            trayIcon.ContextMenuStrip!.Items[0].Text = "Paste by...  (" + hotkey.Display + ")";
-        }
+        settings = form.Result;
+        UnregisterHotkey();
+        RegisterHotkey();
+        trayIcon.Text = "lpastlai — " + settings.HotkeyDisplay;
+        trayIcon.ContextMenuStrip!.Items[0].Text = "Paste by...  (" + settings.HotkeyDisplay + ")";
     }
 
     private Icon CreateTrayIcon()

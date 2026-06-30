@@ -1,4 +1,3 @@
-using System.Drawing.Text;
 using System.Runtime.InteropServices;
 
 namespace lpastlai;
@@ -7,7 +6,9 @@ public class SettingsForm : Form
 {
     private readonly CheckBox chkCtrl, chkAlt, chkShift, chkWin;
     private readonly Label keyDisplay;
-    private readonly HotkeySettings settings;
+    private readonly AppSettings settings;
+    private readonly NumericUpDown numText, numImg;
+    private readonly Panel bgPanel, fgPanel;
     private bool capturing;
 
     private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
@@ -17,14 +18,18 @@ public class SettingsForm : Form
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
-    public HotkeySettings Result { get; private set; }
+    public AppSettings Result { get; private set; }
 
-    public SettingsForm(HotkeySettings current)
+    public SettingsForm(AppSettings current)
     {
-        settings = new HotkeySettings
+        settings = new AppSettings
         {
-            Modifiers = current.Modifiers,
-            Key = current.Key
+            HotkeyModifiers = current.HotkeyModifiers,
+            HotkeyKey = current.HotkeyKey,
+            MaxTextItems = current.MaxTextItems,
+            MaxImageItems = current.MaxImageItems,
+            BgColorArgb = current.BgColorArgb,
+            FgColorArgb = current.FgColorArgb,
         };
         Result = current;
 
@@ -32,14 +37,14 @@ public class SettingsForm : Form
         ShowInTaskbar = false;
         TopMost = true;
         StartPosition = FormStartPosition.CenterScreen;
-        Size = new Size(320, 240);
+        Size = new Size(380, 420);
         BackColor = Color.FromArgb(30, 30, 30);
         Icon = Program.LoadAppIcon();
         _ = Handle;
 
         var title = new Label
         {
-            Text = "Hotkey Settings",
+            Text = "Settings",
             Dock = DockStyle.Top,
             Height = 30,
             Font = new Font("Segoe UI Semibold", 10f),
@@ -53,43 +58,34 @@ public class SettingsForm : Form
         {
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.TopDown,
-            Padding = new Padding(14, 12, 14, 12),
-            BackColor = Color.FromArgb(30, 30, 30)
+            Padding = new Padding(14, 10, 14, 10),
+            BackColor = Color.FromArgb(30, 30, 30),
+            AutoScroll = true
         };
 
-        var modLabel = new Label
-        {
-            Text = "Modifiers:",
-            Font = new Font("Segoe UI", 9f),
-            ForeColor = Color.FromArgb(180, 180, 180),
-            Size = new Size(280, 18)
-        };
+        AddSectionHeader(wrap, "Hotkey");
 
+        wrap.Controls.Add(MakeLabel("Modifiers:"));
         chkCtrl = MakeCheck("Ctrl");
         chkAlt = MakeCheck("Alt");
         chkShift = MakeCheck("Shift");
         chkWin = MakeCheck("Win");
-
         var mods = new FlowLayoutPanel
         {
             FlowDirection = FlowDirection.LeftToRight,
-            Size = new Size(280, 24),
+            Size = new Size(340, 24),
             BackColor = Color.Transparent
         };
         mods.Controls.AddRange(new Control[] { chkCtrl, chkAlt, chkShift, chkWin });
+        wrap.Controls.Add(mods);
 
-        var keyLabel = new Label
-        {
-            Text = "Key:",
-            Font = new Font("Segoe UI", 9f),
-            ForeColor = Color.FromArgb(180, 180, 180),
-            Size = new Size(280, 18),
-            Margin = new Padding(0, 10, 0, 0)
-        };
+        var keyLabel = MakeLabel("Key:");
+        keyLabel.Margin = new Padding(0, 6, 0, 0);
+        wrap.Controls.Add(keyLabel);
 
         keyDisplay = new Label
         {
-            Text = NativeMethods.KeyName(settings.Key),
+            Text = NativeMethods.KeyName(settings.HotkeyKey),
             Font = new Font("Segoe UI", 11f, FontStyle.Bold),
             ForeColor = Color.White,
             BackColor = Color.FromArgb(50, 50, 55),
@@ -98,15 +94,49 @@ public class SettingsForm : Form
             Cursor = Cursors.Hand
         };
         keyDisplay.Click += (_, _) => StartCapture();
+        wrap.Controls.Add(keyDisplay);
+
+        AddSectionHeader(wrap, "Display");
+
+        numText = MakeNud(wrap, "Max text items:", settings.MaxTextItems, 1, 50, 0, 10);
+        numImg = MakeNud(wrap, "Max image items:", settings.MaxImageItems, 1, 50, 0, 6);
+
+        AddSectionHeader(wrap, "Theme");
+
+        var bgRow = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            Size = new Size(340, 28),
+            BackColor = Color.Transparent,
+            Margin = new Padding(0, 0, 0, 4)
+        };
+        var bgLabel = MakeLabel("Background:");
+        bgLabel.Size = new Size(130, 22);
+        bgPanel = MakeColorPanel(settings.BgColor, OnBgClick);
+        bgRow.Controls.Add(bgLabel);
+        bgRow.Controls.Add(bgPanel);
+        wrap.Controls.Add(bgRow);
+
+        var fgRow = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            Size = new Size(340, 28),
+            BackColor = Color.Transparent,
+            Margin = new Padding(0, 0, 0, 10)
+        };
+        var fgLabel = MakeLabel("Font color:");
+        fgLabel.Size = new Size(130, 22);
+        fgPanel = MakeColorPanel(settings.FgColor, OnFgClick);
+        fgRow.Controls.Add(fgLabel);
+        fgRow.Controls.Add(fgPanel);
+        wrap.Controls.Add(fgRow);
 
         var btnRow = new FlowLayoutPanel
         {
             FlowDirection = FlowDirection.RightToLeft,
-            Size = new Size(280, 32),
-            BackColor = Color.Transparent,
-            Margin = new Padding(0, 14, 0, 0)
+            Size = new Size(340, 32),
+            BackColor = Color.Transparent
         };
-
         var saveBtn = new Button
         {
             Text = "Save",
@@ -118,7 +148,6 @@ public class SettingsForm : Form
             Size = new Size(80, 30)
         };
         saveBtn.Click += (_, _) => SaveAndClose();
-
         var cancelBtn = new Button
         {
             Text = "Cancel",
@@ -131,14 +160,8 @@ public class SettingsForm : Form
             Margin = new Padding(0, 0, 8, 0)
         };
         cancelBtn.Click += (_, _) => Close();
-
         btnRow.Controls.Add(saveBtn);
         btnRow.Controls.Add(cancelBtn);
-
-        wrap.Controls.Add(modLabel);
-        wrap.Controls.Add(mods);
-        wrap.Controls.Add(keyLabel);
-        wrap.Controls.Add(keyDisplay);
         wrap.Controls.Add(btnRow);
 
         Controls.Add(wrap);
@@ -146,62 +169,95 @@ public class SettingsForm : Form
 
         KeyPreview = true;
         KeyDown += OnKeyDown;
-
         SyncChecks();
     }
 
-    private void StartCapture()
+    private static void AddSectionHeader(FlowLayoutPanel parent, string text)
     {
-        capturing = true;
-        keyDisplay.Text = "... press a key";
-        keyDisplay.ForeColor = Color.FromArgb(0, 180, 255);
-    }
-
-    private void OnKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (!capturing) return;
-
-        if (e.KeyCode == Keys.Escape)
+        parent.Controls.Add(new Label
         {
-            capturing = false;
-            keyDisplay.Text = NativeMethods.KeyName(settings.Key);
-            keyDisplay.ForeColor = Color.White;
-            return;
-        }
-
-        uint vk = (uint)e.KeyCode;
-        settings.Key = vk;
-        keyDisplay.Text = NativeMethods.KeyName(vk);
-        keyDisplay.ForeColor = Color.White;
-        capturing = false;
+            Text = text,
+            Font = new Font("Segoe UI Semibold", 9.5f),
+            ForeColor = Color.FromArgb(0, 130, 220),
+            BackColor = Color.Transparent,
+            Size = new Size(340, 20),
+            Margin = new Padding(0, 8, 0, 2)
+        });
     }
 
-    private void SyncChecks()
+    private static Label MakeLabel(string text)
     {
-        chkCtrl.Checked = (settings.Modifiers & NativeMethods.MOD_CONTROL) != 0;
-        chkAlt.Checked = (settings.Modifiers & NativeMethods.MOD_ALT) != 0;
-        chkShift.Checked = (settings.Modifiers & NativeMethods.MOD_SHIFT) != 0;
-        chkWin.Checked = (settings.Modifiers & NativeMethods.MOD_WIN) != 0;
-    }
-
-    private void SaveAndClose()
-    {
-        uint mods = 0;
-        if (chkCtrl.Checked) mods |= NativeMethods.MOD_CONTROL;
-        if (chkAlt.Checked) mods |= NativeMethods.MOD_ALT;
-        if (chkShift.Checked) mods |= NativeMethods.MOD_SHIFT;
-        if (chkWin.Checked) mods |= NativeMethods.MOD_WIN;
-
-        if (mods == 0)
+        return new Label
         {
-            keyDisplay.Text = "pick at least one modifier";
-            return;
-        }
+            Text = text,
+            Font = new Font("Segoe UI", 9f),
+            ForeColor = Color.FromArgb(180, 180, 180),
+            Size = new Size(340, 18)
+        };
+    }
 
-        settings.Modifiers = mods | NativeMethods.MOD_NOREPEAT;
-        settings.Save();
-        Result = settings;
-        Close();
+    private static NumericUpDown MakeNud(FlowLayoutPanel parent, string label, int value, int min, int max, int topMargin, int bottomMargin)
+    {
+        var row = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            Size = new Size(340, 28),
+            BackColor = Color.Transparent,
+            Margin = new Padding(0, topMargin, 0, bottomMargin)
+        };
+        row.Controls.Add(new Label
+        {
+            Text = label,
+            Font = new Font("Segoe UI", 9f),
+            ForeColor = Color.FromArgb(180, 180, 180),
+            Size = new Size(200, 22)
+        });
+        var nud = new NumericUpDown
+        {
+            Value = value,
+            Minimum = min,
+            Maximum = max,
+            Width = 60,
+            BackColor = Color.FromArgb(50, 50, 55),
+            ForeColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+        row.Controls.Add(nud);
+        parent.Controls.Add(row);
+        return nud;
+    }
+
+    private static Panel MakeColorPanel(Color c, EventHandler onClick)
+    {
+        var p = new Panel
+        {
+            Size = new Size(100, 22),
+            BackColor = c,
+            Cursor = Cursors.Hand,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+        p.Click += onClick;
+        return p;
+    }
+
+    private void OnBgClick(object? sender, EventArgs e)
+    {
+        using var dlg = new ColorDialog { Color = settings.BgColor, AnyColor = true, FullOpen = true };
+        if (dlg.ShowDialog() == DialogResult.OK)
+        {
+            settings.BgColor = dlg.Color;
+            bgPanel.BackColor = dlg.Color;
+        }
+    }
+
+    private void OnFgClick(object? sender, EventArgs e)
+    {
+        using var dlg = new ColorDialog { Color = settings.FgColor, AnyColor = true, FullOpen = true };
+        if (dlg.ShowDialog() == DialogResult.OK)
+        {
+            settings.FgColor = dlg.Color;
+            fgPanel.BackColor = dlg.Color;
+        }
     }
 
     private CheckBox MakeCheck(string text)
@@ -214,6 +270,58 @@ public class SettingsForm : Form
             BackColor = Color.Transparent,
             AutoSize = true
         };
+    }
+
+    private void StartCapture()
+    {
+        capturing = true;
+        keyDisplay.Text = "... press a key";
+        keyDisplay.ForeColor = Color.FromArgb(0, 180, 255);
+    }
+
+    private void OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (!capturing) return;
+        if (e.KeyCode == Keys.Escape)
+        {
+            capturing = false;
+            keyDisplay.Text = NativeMethods.KeyName(settings.HotkeyKey);
+            keyDisplay.ForeColor = Color.White;
+            return;
+        }
+        uint vk = (uint)e.KeyCode;
+        settings.HotkeyKey = vk;
+        keyDisplay.Text = NativeMethods.KeyName(vk);
+        keyDisplay.ForeColor = Color.White;
+        capturing = false;
+    }
+
+    private void SyncChecks()
+    {
+        chkCtrl.Checked = (settings.HotkeyModifiers & NativeMethods.MOD_CONTROL) != 0;
+        chkAlt.Checked = (settings.HotkeyModifiers & NativeMethods.MOD_ALT) != 0;
+        chkShift.Checked = (settings.HotkeyModifiers & NativeMethods.MOD_SHIFT) != 0;
+        chkWin.Checked = (settings.HotkeyModifiers & NativeMethods.MOD_WIN) != 0;
+    }
+
+    private void SaveAndClose()
+    {
+        uint mods = 0;
+        if (chkCtrl.Checked) mods |= NativeMethods.MOD_CONTROL;
+        if (chkAlt.Checked) mods |= NativeMethods.MOD_ALT;
+        if (chkShift.Checked) mods |= NativeMethods.MOD_SHIFT;
+        if (chkWin.Checked) mods |= NativeMethods.MOD_WIN;
+        if (mods == 0)
+        {
+            keyDisplay.Text = "pick at least one modifier";
+            return;
+        }
+        settings.HotkeyModifiers = mods | NativeMethods.MOD_NOREPEAT;
+        settings.MaxTextItems = (int)numText.Value;
+        settings.MaxImageItems = (int)numImg.Value;
+        settings.Save();
+        Result = settings;
+        Close();
     }
 
     protected override CreateParams CreateParams
