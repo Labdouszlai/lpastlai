@@ -139,7 +139,7 @@ public class SettingsForm : Form
         };
         var saveBtn = new Button
         {
-            Text = "Save",
+            Text = "Save Settings",
             Font = new Font("Segoe UI", 9f),
             FlatStyle = FlatStyle.Flat,
             BackColor = Color.FromArgb(0, 103, 192),
