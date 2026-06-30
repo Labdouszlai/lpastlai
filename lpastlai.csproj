@@ -8,6 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>lpastlai</AssemblyName>
     <RootNamespace>lpastlai</RootNamespace>
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
 
     <Authors>labdouszlai</Authors>
