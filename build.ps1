@@ -3,7 +3,7 @@ param(
 )
 
 if (-not $SkipBuild) {
-    Write-Host "Building lpastlai..." -ForegroundColor Cyan
+    Write-Host "Building L'Pastlai..." -ForegroundColor Cyan
     dotnet build -c Release
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Build failed." -ForegroundColor Red
@@ -33,7 +33,7 @@ foreach ($t in $targets) {
     }
 
     $src = Join-Path $projectDir "bin\Release\net8.0-windows\$rid\publish\lpastlai.exe"
-    $dst = Join-Path $outputDir "lpastlai-$suffix.exe"
+    $dst = Join-Path $outputDir "L'Pastlai-$suffix.exe"
 
     if (Test-Path $src) {
         Copy-Item -Path $src -Destination $dst -Force

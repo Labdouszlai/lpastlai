@@ -7,7 +7,7 @@ public static class HistoryStore
     public const int MaxStored = 50;
 
     private static readonly string FolderPath =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "lpastlai");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "L'Pastlai");
 
     private static readonly string FilePath = Path.Combine(FolderPath, "history.json");
 

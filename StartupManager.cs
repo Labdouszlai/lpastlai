@@ -5,7 +5,7 @@ namespace lpastlai;
 internal static class StartupManager
 {
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string AppName = "lpastlai";
+    private const string AppName = "L'Pastlai";
 
     public static bool IsEnabled()
     {

@@ -1,4 +1,4 @@
-# lpastlai
+# L'Pastlai
 
 A lightweight clipboard history app for Windows. Lives in the tray, remembers your copied items (text + images), and lets you paste any of them with a configurable hotkey.
 
@@ -9,7 +9,7 @@ A lightweight clipboard history app for Windows. Lives in the tray, remembers yo
 ## How it works
 
 - Runs in the system tray.
-- Saves text and images you copy to `%AppData%\lpastlai\history.json`.
+- Saves text and images you copy to `%AppData%\L'Pastlai\history.json`.
 - Hit the hotkey anywhere and a split popup appears where your cursor is.
 - Left side: text items. Right side: image items with thumbnails.
 - Tab to switch panels, arrow keys + Enter to paste. Esc to dismiss.
@@ -20,8 +20,8 @@ Pre-built binaries are in [Releases](https://github.com/labdouszlai/lpastlai/rel
 
 | Platform | File |
 |----------|------|
-| Windows 64-bit | `lpastlai-win-x64.exe` |
-| Windows 32-bit | `lpastlai-win-x86.exe` |
+| Windows 64-bit | `L'Pastlai-win-x64.exe` |
+| Windows 32-bit | `L'Pastlai-win-x86.exe` |
 
 No install needed. Right-click the tray icon for settings and "Start with Windows".
 
@@ -49,4 +49,4 @@ Or use `build.ps1` to produce both win-x64 and win-x86 single-file executables.
 
 ## License
 
-MIT © [labdouszlai](https://github.com/labdouszlai)
+MIT © [l'abdouszlai](https://github.com/labdouszlai)

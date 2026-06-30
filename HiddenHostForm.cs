@@ -193,7 +193,7 @@ public class HiddenHostForm : Form
         trayIcon = new NotifyIcon
         {
             Icon = appIcon,
-            Text = "lpastlai — " + settings.HotkeyDisplay,
+            Text = "L'Pastlai — " + settings.HotkeyDisplay,
             Visible = true,
             ContextMenuStrip = menu
         };
@@ -209,7 +209,7 @@ public class HiddenHostForm : Form
         settings = form.Result;
         UnregisterHotkey();
         RegisterHotkey();
-        trayIcon.Text = "lpastlai — " + settings.HotkeyDisplay;
+        trayIcon.Text = "L'Pastlai — " + settings.HotkeyDisplay;
         trayIcon.ContextMenuStrip!.Items[0].Text = "Paste by...  (" + settings.HotkeyDisplay + ")";
     }
 
