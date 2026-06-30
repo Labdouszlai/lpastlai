@@ -1,5 +1,3 @@
-using System.Drawing.Text;
-
 namespace lpastlai;
 
 public class HiddenHostForm : Form
@@ -11,7 +9,6 @@ public class HiddenHostForm : Form
     private IntPtr lastForegroundWindow = IntPtr.Zero;
     private System.Windows.Forms.Timer? pasteTimer;
     private Icon? appIcon;
-    private Bitmap? iconBitmap;
     private HotkeySettings hotkey;
 
     public HiddenHostForm()
@@ -221,20 +218,7 @@ public class HiddenHostForm : Form
 
     private Icon CreateTrayIcon()
     {
-        iconBitmap = new Bitmap(16, 16);
-        using var g = Graphics.FromImage(iconBitmap);
-        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-        g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
-        g.Clear(Color.Transparent);
-
-        using var bg = new SolidBrush(Color.FromArgb(0, 103, 192));
-        g.FillEllipse(bg, 1, 1, 14, 14);
-
-        using var font = new Font("Segoe UI", 7.5f, FontStyle.Bold);
-        using var tb = new SolidBrush(Color.White);
-        g.DrawString("p", font, tb, 3.5f, 3);
-
-        return Icon.FromHandle(iconBitmap.GetHicon());
+        return new Icon("app.ico");
     }
 
     private void ExitApp()
@@ -245,7 +229,6 @@ public class HiddenHostForm : Form
         trayIcon.Icon = null;
         trayIcon.Dispose();
         appIcon?.Dispose();
-        iconBitmap?.Dispose();
         Application.Exit();
     }
 
@@ -257,7 +240,6 @@ public class HiddenHostForm : Form
             NativeMethods.RemoveClipboardFormatListener(Handle);
             trayIcon?.Dispose();
             appIcon?.Dispose();
-            iconBitmap?.Dispose();
             pasteTimer?.Dispose();
         }
         base.Dispose(disposing);
