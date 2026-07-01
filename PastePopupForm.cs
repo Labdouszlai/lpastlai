@@ -207,8 +207,8 @@ public class PastePopupForm : Form
         textList.Focus();
 
         var screen = Screen.FromPoint(Location).WorkingArea;
-        int x = Math.Clamp(Location.X, screen.Left, screen.Right - Width);
-        int y = Math.Clamp(Location.Y, screen.Top, screen.Bottom - Height);
+        int x = Math.Max(screen.Left, Math.Min(Location.X, screen.Right - Width));
+        int y = Math.Max(screen.Top, Math.Min(Location.Y, screen.Bottom - Height));
         Location = new Point(x, y);
 
         FadeIn();
