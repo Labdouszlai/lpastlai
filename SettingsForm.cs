@@ -5,11 +5,12 @@ namespace lpastlai;
 public class SettingsForm : Form
 {
     private readonly CheckBox chkCtrl, chkAlt, chkShift, chkWin;
-    private readonly Label keyDisplay;
+    private readonly CheckBox chkFavCtrl, chkFavAlt, chkFavShift, chkFavWin;
+    private readonly Label keyDisplay, favKeyDisplay;
     private readonly AppSettings settings;
     private readonly NumericUpDown numText, numImg;
     private readonly Panel bgPanel, fgPanel;
-    private bool capturing;
+    private bool capturing, favCapturing;
 
     private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
     private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
@@ -37,7 +38,7 @@ public class SettingsForm : Form
         ShowInTaskbar = false;
         TopMost = true;
         StartPosition = FormStartPosition.CenterScreen;
-        Size = new Size(500, 300);
+        Size = new Size(500, 410);
         BackColor = Color.FromArgb(30, 30, 30);
         Icon = Program.LoadAppIcon();
         _ = Handle;
@@ -100,7 +101,7 @@ public class SettingsForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
-            RowCount = 9,
+            RowCount = 12,
             BackColor = Color.FromArgb(30, 30, 30),
             Padding = new Padding(14, 6, 14, 0)
         };
@@ -111,6 +112,9 @@ public class SettingsForm : Form
         table.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
         table.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
         table.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
+        table.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+        table.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+        table.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
         table.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
         table.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
         table.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
@@ -118,8 +122,9 @@ public class SettingsForm : Form
         table.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
 
         AddHeader(table, "HOTKEY", 0);
-        AddHeader(table, "DISPLAY", 3);
-        AddHeader(table, "THEME", 6);
+        AddHeader(table, "FAVORITES HOTKEY", 3);
+        AddHeader(table, "DISPLAY", 6);
+        AddHeader(table, "THEME", 9);
 
         chkCtrl = MakeCheck("Ctrl");
         chkAlt = MakeCheck("Alt");
@@ -150,16 +155,45 @@ public class SettingsForm : Form
         keyDisplay.Click += (_, _) => StartCapture();
         table.Controls.Add(keyDisplay, 1, 2);
 
-        numText = AddNudRow(table, "Max text items:", settings.MaxTextItems, 4);
-        numImg = AddNudRow(table, "Max image items:", settings.MaxImageItems, 5);
+        chkFavCtrl = MakeCheck("Ctrl");
+        chkFavAlt = MakeCheck("Alt");
+        chkFavShift = MakeCheck("Shift");
+        chkFavWin = MakeCheck("Win");
+        var favMods = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            Dock = DockStyle.Fill,
+            BackColor = Color.Transparent,
+            Margin = new Padding(0)
+        };
+        favMods.Controls.AddRange(new Control[] { chkFavCtrl, chkFavAlt, chkFavShift, chkFavWin });
+        table.Controls.Add(favMods, 0, 4);
+        table.SetColumnSpan(favMods, 2);
 
-        table.Controls.Add(MakeLabel("Background:"), 0, 7);
+        table.Controls.Add(MakeLabel("Key:"), 0, 5);
+        favKeyDisplay = new Label
+        {
+            Text = NativeMethods.KeyName(settings.FavoritesHotkeyKey),
+            Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = Color.FromArgb(50, 50, 55),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Dock = DockStyle.Fill,
+            Cursor = Cursors.Hand
+        };
+        favKeyDisplay.Click += (_, _) => StartFavCapture();
+        table.Controls.Add(favKeyDisplay, 1, 5);
+
+        numText = AddNudRow(table, "Max text items:", settings.MaxTextItems, 7);
+        numImg = AddNudRow(table, "Max image items:", settings.MaxImageItems, 8);
+
+        table.Controls.Add(MakeLabel("Background:"), 0, 10);
         bgPanel = MakeColorPanel(settings.BgColor, OnBgClick);
-        table.Controls.Add(bgPanel, 1, 7);
+        table.Controls.Add(bgPanel, 1, 10);
 
-        table.Controls.Add(MakeLabel("Font color:"), 0, 8);
+        table.Controls.Add(MakeLabel("Font color:"), 0, 11);
         fgPanel = MakeColorPanel(settings.FgColor, OnFgClick);
-        table.Controls.Add(fgPanel, 1, 8);
+        table.Controls.Add(fgPanel, 1, 11);
 
         Controls.Add(table);
         Controls.Add(btnPanel);
@@ -269,21 +303,43 @@ public class SettingsForm : Form
         keyDisplay.ForeColor = Color.FromArgb(0, 180, 255);
     }
 
+    private void StartFavCapture()
+    {
+        favCapturing = true;
+        favKeyDisplay.Text = "... press a key";
+        favKeyDisplay.ForeColor = Color.FromArgb(0, 180, 255);
+    }
+
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (!capturing) return;
-        if (e.KeyCode == Keys.Escape)
+        if (capturing)
         {
-            capturing = false;
+            if (e.KeyCode == Keys.Escape)
+            {
+                capturing = false;
+                keyDisplay.Text = NativeMethods.KeyName(settings.HotkeyKey);
+                keyDisplay.ForeColor = Color.White;
+                return;
+            }
+            settings.HotkeyKey = (uint)e.KeyCode;
             keyDisplay.Text = NativeMethods.KeyName(settings.HotkeyKey);
             keyDisplay.ForeColor = Color.White;
-            return;
+            capturing = false;
         }
-        uint vk = (uint)e.KeyCode;
-        settings.HotkeyKey = vk;
-        keyDisplay.Text = NativeMethods.KeyName(vk);
-        keyDisplay.ForeColor = Color.White;
-        capturing = false;
+        else if (favCapturing)
+        {
+            if (e.KeyCode == Keys.Escape)
+            {
+                favCapturing = false;
+                favKeyDisplay.Text = NativeMethods.KeyName(settings.FavoritesHotkeyKey);
+                favKeyDisplay.ForeColor = Color.White;
+                return;
+            }
+            settings.FavoritesHotkeyKey = (uint)e.KeyCode;
+            favKeyDisplay.Text = NativeMethods.KeyName(settings.FavoritesHotkeyKey);
+            favKeyDisplay.ForeColor = Color.White;
+            favCapturing = false;
+        }
     }
 
     private void SyncChecks()
@@ -292,6 +348,10 @@ public class SettingsForm : Form
         chkAlt.Checked = (settings.HotkeyModifiers & NativeMethods.MOD_ALT) != 0;
         chkShift.Checked = (settings.HotkeyModifiers & NativeMethods.MOD_SHIFT) != 0;
         chkWin.Checked = (settings.HotkeyModifiers & NativeMethods.MOD_WIN) != 0;
+        chkFavCtrl.Checked = (settings.FavoritesHotkeyModifiers & NativeMethods.MOD_CONTROL) != 0;
+        chkFavAlt.Checked = (settings.FavoritesHotkeyModifiers & NativeMethods.MOD_ALT) != 0;
+        chkFavShift.Checked = (settings.FavoritesHotkeyModifiers & NativeMethods.MOD_SHIFT) != 0;
+        chkFavWin.Checked = (settings.FavoritesHotkeyModifiers & NativeMethods.MOD_WIN) != 0;
     }
 
     private void SaveAndClose()
@@ -307,6 +367,19 @@ public class SettingsForm : Form
             return;
         }
         settings.HotkeyModifiers = mods | NativeMethods.MOD_NOREPEAT;
+
+        uint favMods = 0;
+        if (chkFavCtrl.Checked) favMods |= NativeMethods.MOD_CONTROL;
+        if (chkFavAlt.Checked) favMods |= NativeMethods.MOD_ALT;
+        if (chkFavShift.Checked) favMods |= NativeMethods.MOD_SHIFT;
+        if (chkFavWin.Checked) favMods |= NativeMethods.MOD_WIN;
+        if (favMods == 0)
+        {
+            favKeyDisplay.Text = "pick at least one modifier";
+            return;
+        }
+        settings.FavoritesHotkeyModifiers = favMods | NativeMethods.MOD_NOREPEAT;
+
         settings.MaxTextItems = (int)numText.Value;
         settings.MaxImageItems = (int)numImg.Value;
         settings.Save();

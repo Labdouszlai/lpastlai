@@ -3,6 +3,7 @@ namespace lpastlai;
 public class HiddenHostForm : Form
 {
     private const int HOTKEY_ID = 0xCAFE;
+    private const int FAVORITES_HOTKEY_ID = 0xCAFF;
 
     private readonly List<ClipItem> history;
     private NotifyIcon trayIcon = null!;
@@ -49,11 +50,13 @@ public class HiddenHostForm : Form
     private void RegisterHotkey()
     {
         NativeMethods.RegisterHotKey(Handle, HOTKEY_ID, settings.HotkeyModifiers, settings.HotkeyKey);
+        NativeMethods.RegisterHotKey(Handle, FAVORITES_HOTKEY_ID, settings.FavoritesHotkeyModifiers, settings.FavoritesHotkeyKey);
     }
 
     private void UnregisterHotkey()
     {
         NativeMethods.UnregisterHotKey(Handle, HOTKEY_ID);
+        NativeMethods.UnregisterHotKey(Handle, FAVORITES_HOTKEY_ID);
     }
 
     protected override void WndProc(ref Message m)
@@ -65,8 +68,11 @@ public class HiddenHostForm : Form
                 break;
 
             case NativeMethods.WM_HOTKEY:
-                if (m.WParam.ToInt32() == HOTKEY_ID)
+                int id = m.WParam.ToInt32();
+                if (id == HOTKEY_ID)
                     ShowPastePopup();
+                else if (id == FAVORITES_HOTKEY_ID)
+                    ShowFavoritesPopup();
                 break;
         }
 
@@ -102,6 +108,21 @@ public class HiddenHostForm : Form
         NativeMethods.GetCursorPos(out var pos);
 
         var popup = new PastePopupForm(history, OnItemChosen, settings)
+        {
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(pos.X, pos.Y)
+        };
+        popup.Show();
+        popup.Activate();
+    }
+
+    private void ShowFavoritesPopup()
+    {
+        lastForegroundWindow = NativeMethods.GetForegroundWindow();
+
+        NativeMethods.GetCursorPos(out var pos);
+
+        var popup = new PastePopupForm(history, OnItemChosen, settings, favoritesOnly: true)
         {
             StartPosition = FormStartPosition.Manual,
             Location = new Point(pos.X, pos.Y)
@@ -193,7 +214,7 @@ public class HiddenHostForm : Form
         trayIcon = new NotifyIcon
         {
             Icon = appIcon,
-            Text = "L'Pastlai — " + settings.HotkeyDisplay,
+            Text = "L'Pastlai â€” " + settings.HotkeyDisplay,
             Visible = true,
             ContextMenuStrip = menu
         };
@@ -209,7 +230,7 @@ public class HiddenHostForm : Form
         settings = form.Result;
         UnregisterHotkey();
         RegisterHotkey();
-        trayIcon.Text = "L'Pastlai — " + settings.HotkeyDisplay;
+        trayIcon.Text = "L'Pastlai â€” " + settings.HotkeyDisplay;
         trayIcon.ContextMenuStrip!.Items[0].Text = "Paste by...  (" + settings.HotkeyDisplay + ")";
     }
 

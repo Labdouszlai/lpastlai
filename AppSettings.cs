@@ -7,6 +7,8 @@ public class AppSettings
 {
     public uint HotkeyModifiers { get; set; } = NativeMethods.MOD_CONTROL | NativeMethods.MOD_SHIFT;
     public uint HotkeyKey { get; set; } = NativeMethods.VK_V;
+    public uint FavoritesHotkeyModifiers { get; set; } = NativeMethods.MOD_CONTROL | NativeMethods.MOD_SHIFT;
+    public uint FavoritesHotkeyKey { get; set; } = NativeMethods.VK_B;
     public int MaxTextItems { get; set; } = 8;
     public int MaxImageItems { get; set; } = 8;
     public int BgColorArgb { get; set; } = Color.FromArgb(30, 30, 30).ToArgb();
@@ -32,6 +34,16 @@ public class AppSettings
         {
             string m = NativeMethods.ModifierString(HotkeyModifiers);
             string k = NativeMethods.KeyName(HotkeyKey);
+            return m.Length > 0 ? $"{m}+{k}" : k;
+        }
+    }
+
+    public string FavoritesHotkeyDisplay
+    {
+        get
+        {
+            string m = NativeMethods.ModifierString(FavoritesHotkeyModifiers);
+            string k = NativeMethods.KeyName(FavoritesHotkeyKey);
             return m.Length > 0 ? $"{m}+{k}" : k;
         }
     }

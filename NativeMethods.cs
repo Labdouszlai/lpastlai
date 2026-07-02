@@ -14,6 +14,7 @@ internal static class NativeMethods
     public const uint MOD_NOREPEAT = 0x4000;
 
     public const uint VK_V = 0x56;
+    public const uint VK_B = 0x42;
     public const byte VK_CONTROL = 0x11;
     public const uint KEYEVENTF_KEYUP = 0x0002;
 

@@ -12,11 +12,14 @@ public class PastePopupForm : Form
     private readonly List<ClipItem> textItems = new();
     private readonly List<ClipItem> imgItems = new();
     private readonly AppSettings settings;
+    private readonly bool favoritesOnly;
 
     private const int TextItemH = 44;
     private const int ImgItemH = 80;
     private const int MaxPreview = 60;
     private const int Thumb = 64;
+    private const int StarSize = 18;
+    private const int StarRightMargin = 8;
 
     private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
     private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
@@ -25,14 +28,17 @@ public class PastePopupForm : Form
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
-    public PastePopupForm(List<ClipItem> allItems, Action<ClipItem> onSelect, AppSettings settings)
+    public PastePopupForm(List<ClipItem> allItems, Action<ClipItem> onSelect, AppSettings settings, bool favoritesOnly = false)
     {
         this.allItems = allItems;
         this.onSelect = onSelect;
         this.settings = settings;
+        this.favoritesOnly = favoritesOnly;
 
         foreach (var item in allItems)
         {
+            if (favoritesOnly && !item.IsFavorited)
+                continue;
             if (item.IsImage)
                 imgItems.Add(item);
             else
@@ -84,6 +90,9 @@ public class PastePopupForm : Form
         imgList.MeasureItem += (_, e) => e.ItemHeight = ImgItemH;
         textList.DrawItem += OnDrawTextItem;
         imgList.DrawItem += OnDrawImgItem;
+
+        textList.MouseClick += (_, e) => HandleStarClick(e, textList, textItems);
+        imgList.MouseClick += (_, e) => HandleStarClick(e, imgList, imgItems);
 
         textList.DoubleClick += (_, _) => Pick(textList, textItems);
         imgList.DoubleClick += (_, _) => Pick(imgList, imgItems);
@@ -167,6 +176,44 @@ public class PastePopupForm : Form
         }
     }
 
+    private void HandleStarClick(MouseEventArgs e, ListBox list, List<ClipItem> source)
+    {
+        int idx = list.IndexFromPoint(e.Location);
+        if (idx < 0 || idx >= source.Count) return;
+
+        int itemH = source == imgItems ? ImgItemH : TextItemH;
+        int starLeft = list.ClientSize.Width - StarSize - StarRightMargin;
+
+        if (e.X < starLeft) return;
+
+        var item = source[idx];
+        ToggleFavorite(item);
+
+        if (favoritesOnly)
+        {
+            source.RemoveAt(idx);
+            list.Items.RemoveAt(idx);
+            if (source.Count == 0)
+            {
+                list.Items.Add("(no favorites)");
+                list.Enabled = false;
+            }
+            list.Invalidate();
+        }
+        else
+        {
+            list.Invalidate(list.GetItemRectangle(idx));
+        }
+    }
+
+    private void ToggleFavorite(ClipItem item)
+    {
+        var original = allItems.Find(i => ReferenceEquals(i, item));
+        if (original != null)
+            original.IsFavorited = !original.IsFavorited;
+        HistoryStore.Save(allItems);
+    }
+
     private void Pick(ListBox list, List<ClipItem> source)
     {
         int idx = list.SelectedIndex;
@@ -247,11 +294,20 @@ public class PastePopupForm : Form
         g.DrawLine(sep, r.Left, r.Top, r.Right, r.Top);
 
         var item = textItems[e.Index];
+
+        int starLeft = r.Right - StarSize - StarRightMargin;
+        int starTop = r.Top + (r.Height - StarSize) / 2;
+        using var sf = new Font("Segoe UI", 11f, FontStyle.Bold);
+        using var sb = new SolidBrush(item.IsFavorited ? Color.FromArgb(255, 200, 50) : Shift(settings.FgColor, 0.3f));
+        g.DrawString(item.IsFavorited ? "â˜…" : "â˜†", sf, sb, starLeft, starTop);
+
+        int textRight = starLeft - 8;
+        var textR = new Rectangle(r.Left + 10, r.Top + 6, textRight - r.Left - 10, r.Height - 24);
         string preview = TextPreview(item.Text);
 
         using var pf = new Font("Segoe UI", 9.5f);
         using var tb = new SolidBrush(sel ? settings.FgColor : settings.FgColor);
-        g.DrawString(preview, pf, tb, r.Left + 10, r.Top + 6);
+        g.DrawString(preview, pf, tb, textR);
 
         using var tf = new Font("Segoe UI", 8f);
         using var tim = new SolidBrush(Shift(settings.FgColor, 0.4f));
@@ -294,6 +350,12 @@ public class PastePopupForm : Form
             using var b = new SolidBrush(Shift(settings.FgColor, 0.5f));
             g.DrawString("err", f, b, tx + 20, ty + 24);
         }
+
+        int starLeft = r.Right - StarSize - StarRightMargin;
+        int starTop = r.Top + (r.Height - StarSize) / 2;
+        using var sf = new Font("Segoe UI", 11f, FontStyle.Bold);
+        using var sb = new SolidBrush(item.IsFavorited ? Color.FromArgb(255, 200, 50) : Shift(settings.FgColor, 0.3f));
+        g.DrawString(item.IsFavorited ? "â˜…" : "â˜†", sf, sb, starLeft, starTop);
 
         int lx = tx + Thumb + 12;
         using var nf = new Font("Segoe UI", 9f);
